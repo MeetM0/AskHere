@@ -1,0 +1,14 @@
+{
+  "name": "askhere",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Highlight text anywhere and ask AI in a small popup right next to it.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "node tests/e2e/run.mjs",
+    "icons": "python3 scripts/make_icons.py",
+    "zip": "cd extension && zip -r ../askhere.zip . -x '.*'"
+  }
+}

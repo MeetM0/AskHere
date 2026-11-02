@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AskHere Settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon48.png" alt="" width="40" height="40" />
+        <div>
+          <h1>AskHere</h1>
+          <p class="sub">Highlight text anywhere → click <b>✦ Ask AI</b> → get the answer right next to it.</p>
+        </div>
+      </header>
+
+      <section>
+        <h2>AI provider</h2>
+        <div class="seg" role="radiogroup" aria-label="Provider">
+          <label><input type="radio" name="provider" value="anthropic" /> Claude</label>
+          <label><input type="radio" name="provider" value="openai" /> ChatGPT (OpenAI)</label>
+        </div>
+
+        <div class="provider-box" data-provider="anthropic">
+          <label class="field">
+            <span>Claude API key</span>
+            <input id="anthropicKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
+            <small>Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</small>
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <select id="anthropicModelSelect"></select>
+          </label>
+          <label class="field" id="anthropicModelCustomWrap" hidden>
+            <span>Custom model ID</span>
+            <input id="anthropicModelCustom" type="text" spellcheck="false" placeholder="claude-…" />
+          </label>
+          <label class="field">
+            <span>Thinking effort</span>
+            <select id="effort">
+              <option value="low">Low — fastest answers (recommended for quick questions)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High — slower, more careful</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="provider-box" data-provider="openai">
+          <label class="field">
+            <span>OpenAI API key</span>
+            <input id="openaiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" />
+            <small>Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</small>
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <input id="openaiModel" type="text" spellcheck="false" placeholder="gpt-5" />
+          </label>
+        </div>
+
+        <div class="row">
+          <button id="test" type="button">Test connection</button>
+          <span id="testResult" class="status" role="status"></span>
+        </div>
+        <p class="hint">🔒 Keys are stored only in this browser (<code>chrome.storage.local</code>), are never synced, and are only sent to the provider you picked.</p>
+      </section>
+
+      <section>
+        <h2>Answers</h2>
+        <label class="field">
+          <span>Answer length</span>
+          <select id="answerLength">
+            <option value="concise">Concise</option>
+            <option value="detailed">Detailed</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Custom instructions <em>(optional)</em></span>
+          <textarea id="customInstructions" rows="3" placeholder="e.g. Answer in Hindi. I'm a beginner programmer."></textarea>
+        </label>
+      </section>
+
+      <section>
+        <h2>When to show the button</h2>
+        <label class="field">
+          <span>Ask AI button</span>
+          <select id="triggerMode">
+            <option value="button">Whenever I select text</option>
+            <option value="alt">Only when I hold Alt while selecting</option>
+            <option value="off">Never (use shortcut or right-click menu)</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Don't show the button on these sites</span>
+          <textarea id="disabledSites" rows="3" spellcheck="false" placeholder="docs.google.com&#10;figma.com"></textarea>
+          <small>One domain per line. The shortcut and right-click menu still work there.</small>
+        </label>
+        <p class="hint">
+          Shortcut: <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> asks about the current selection.
+          Change it at <code>chrome://extensions/shortcuts</code>.
+        </p>
+      </section>
+
+      <footer>
+        <span id="saved" class="status" role="status"></span>
+        <a href="https://github.com/MeetM0/askhere" target="_blank" rel="noopener">Open source on GitHub</a>
+      </footer>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

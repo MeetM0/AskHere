@@ -1,0 +1,423 @@
+/* Styles for AskHere's UI. Lives inside a shadow root, so page CSS can't leak in. */
+
+:host {
+  all: initial;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.ah-trigger,
+.ah-panel,
+.ah-bubble {
+  --ah-bg: #ffffff;
+  --ah-fg: #1c1b1f;
+  --ah-muted: #6b6870;
+  --ah-border: rgba(20, 16, 30, 0.12);
+  --ah-soft: #f4f2f7;
+  --ah-accent: #c2612c;
+  --ah-accent-fg: #ffffff;
+  --ah-user: #fbeee6;
+  --ah-code: #f2f0f5;
+  --ah-error: #b3261e;
+  --ah-shadow: 0 12px 32px rgba(20, 16, 30, 0.18), 0 2px 6px rgba(20, 16, 30, 0.08);
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ah-fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  .ah-trigger,
+  .ah-panel,
+  .ah-bubble {
+    --ah-bg: #222026;
+    --ah-fg: #eceaf0;
+    --ah-muted: #a29fa8;
+    --ah-border: rgba(255, 255, 255, 0.12);
+    --ah-soft: #2d2a32;
+    --ah-accent: #e07a43;
+    --ah-accent-fg: #1a1410;
+    --ah-user: #3a2c24;
+    --ah-code: #2d2a32;
+    --ah-error: #f2b8b5;
+    --ah-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+/* ---------- trigger button ---------- */
+
+.ah-trigger {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 11px 5px 9px;
+  border: 1px solid var(--ah-border);
+  border-radius: 999px;
+  background: var(--ah-bg);
+  box-shadow: var(--ah-shadow);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: ah-pop 120ms ease-out;
+}
+
+.ah-trigger.ah-visible {
+  display: inline-flex;
+}
+
+.ah-trigger:hover {
+  background: var(--ah-soft);
+}
+
+.ah-spark {
+  color: var(--ah-accent);
+}
+
+@keyframes ah-pop {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+}
+
+/* ---------- panel ---------- */
+
+.ah-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(400px, calc(100vw - 16px));
+  max-height: min(60vh, 560px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ah-bg);
+  border: 1px solid var(--ah-border);
+  border-radius: 14px;
+  box-shadow: var(--ah-shadow);
+  overflow: hidden;
+  animation: ah-pop 140ms ease-out;
+}
+
+.ah-panel.ah-hidden {
+  display: none;
+}
+
+.ah-panel.ah-dragging {
+  user-select: none;
+  opacity: 0.96;
+}
+
+.ah-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 6px 12px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.ah-dragging .ah-head {
+  cursor: grabbing;
+}
+
+.ah-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.ah-grow {
+  flex: 1;
+}
+
+.ah-icon {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ah-muted);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.ah-icon:hover {
+  background: var(--ah-soft);
+  color: var(--ah-fg);
+}
+
+.ah-quote {
+  margin: 0 12px 6px;
+  padding: 4px 0 4px 10px;
+  border-left: 3px solid var(--ah-accent);
+  color: var(--ah-muted);
+  font-size: 12.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ah-thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 12px;
+  overscroll-behavior: contain;
+}
+
+.ah-thread:empty {
+  display: none;
+}
+
+.ah-msg {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+
+.ah-user {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--ah-user);
+  white-space: pre-wrap;
+  width: fit-content;
+  max-width: 85%;
+  margin-left: auto;
+}
+
+.ah-ai {
+  padding: 2px 0;
+}
+
+.ah-error .ah-md {
+  color: var(--ah-error);
+  white-space: pre-wrap;
+}
+
+.ah-note {
+  margin-top: 4px;
+  color: var(--ah-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.ah-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.ah-action {
+  padding: 2px 8px;
+  border: 1px solid var(--ah-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ah-muted);
+  font-size: 12px;
+}
+
+.ah-action:hover {
+  color: var(--ah-fg);
+  background: var(--ah-soft);
+}
+
+/* rendered markdown */
+.ah-md > :first-child {
+  margin-top: 0;
+}
+.ah-md > :last-child {
+  margin-bottom: 0;
+}
+.ah-md p,
+.ah-md ul,
+.ah-md ol,
+.ah-md pre,
+.ah-md blockquote {
+  margin: 0 0 8px;
+}
+.ah-md ul,
+.ah-md ol {
+  padding-left: 20px;
+}
+.ah-md li {
+  margin: 2px 0;
+}
+.ah-md h3,
+.ah-md h4,
+.ah-md h5,
+.ah-md h6 {
+  margin: 10px 0 4px;
+  font-size: 14px;
+}
+.ah-md code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--ah-code);
+  font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.ah-md pre {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ah-code);
+  overflow-x: auto;
+}
+.ah-md pre code {
+  padding: 0;
+  background: none;
+}
+.ah-md blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--ah-border);
+  color: var(--ah-muted);
+}
+.ah-md a {
+  color: var(--ah-accent);
+}
+.ah-md hr {
+  border: 0;
+  border-top: 1px solid var(--ah-border);
+}
+
+.ah-dots {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px 0;
+}
+.ah-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ah-muted);
+  animation: ah-blink 1s infinite ease-in-out;
+}
+.ah-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.ah-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes ah-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* quick actions */
+.ah-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 12px 8px;
+}
+
+.ah-chip {
+  padding: 3px 10px;
+  border: 1px solid var(--ah-border);
+  border-radius: 999px;
+  background: var(--ah-soft);
+  font-size: 12.5px;
+}
+
+.ah-chip:hover {
+  border-color: var(--ah-accent);
+}
+
+/* input */
+.ah-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 4px 8px 8px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--ah-border);
+  border-radius: 11px;
+  background: var(--ah-soft);
+}
+
+.ah-form:focus-within {
+  border-color: var(--ah-accent);
+}
+
+.ah-input {
+  flex: 1;
+  min-height: 24px;
+  max-height: 120px;
+  padding: 4px 0;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ah-fg);
+  font: inherit;
+}
+
+.ah-input::placeholder {
+  color: var(--ah-muted);
+}
+
+.ah-send {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--ah-accent);
+  color: var(--ah-accent-fg);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ah-send.ah-stop {
+  font-size: 11px;
+}
+
+/* minimized bubble */
+.ah-bubble {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--ah-border);
+  border-radius: 50%;
+  background: var(--ah-bg);
+  color: var(--ah-accent);
+  box-shadow: var(--ah-shadow);
+  font-size: 13px;
+}
+
+.ah-bubble.ah-visible {
+  display: block;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ah-accent);
+  outline-offset: 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+  }
+}
+
+/* The surrounding form already shows focus. */
+.ah-input:focus-visible {
+  outline: none;
+}

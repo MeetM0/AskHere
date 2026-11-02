@@ -1,0 +1,4 @@
+node_modules/
+askhere.zip
+tests/e2e/screenshots/
+.DS_Store
