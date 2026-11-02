@@ -12,72 +12,50 @@
         <img src="icons/icon48.png" alt="" width="40" height="40" />
         <div>
           <h1>AskHere</h1>
-          <p class="sub">Highlight text anywhere → click <b>✦ Ask AI</b> → get the answer right next to it.</p>
+          <p class="sub">Highlight text anywhere → click <b>✦ Ask AI</b> → your Claude or ChatGPT opens right next to it.</p>
         </div>
       </header>
 
-      <section>
-        <h2>AI provider</h2>
-        <div class="seg" role="radiogroup" aria-label="Provider">
-          <label><input type="radio" name="provider" value="anthropic" /> Claude</label>
-          <label><input type="radio" name="provider" value="openai" /> ChatGPT (OpenAI)</label>
-        </div>
-
-        <div class="provider-box" data-provider="anthropic">
-          <label class="field">
-            <span>Claude API key</span>
-            <input id="anthropicKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" />
-            <small>Get one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</small>
-          </label>
-          <label class="field">
-            <span>Model</span>
-            <select id="anthropicModelSelect"></select>
-          </label>
-          <label class="field" id="anthropicModelCustomWrap" hidden>
-            <span>Custom model ID</span>
-            <input id="anthropicModelCustom" type="text" spellcheck="false" placeholder="claude-…" />
-          </label>
-          <label class="field">
-            <span>Thinking effort</span>
-            <select id="effort">
-              <option value="low">Low — fastest answers (recommended for quick questions)</option>
-              <option value="medium">Medium</option>
-              <option value="high">High — slower, more careful</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="provider-box" data-provider="openai">
-          <label class="field">
-            <span>OpenAI API key</span>
-            <input id="openaiKey" type="password" autocomplete="off" spellcheck="false" placeholder="sk-…" />
-            <small>Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</small>
-          </label>
-          <label class="field">
-            <span>Model</span>
-            <input id="openaiModel" type="text" spellcheck="false" placeholder="gpt-5" />
-          </label>
-        </div>
-
-        <div class="row">
-          <button id="test" type="button">Test connection</button>
-          <span id="testResult" class="status" role="status"></span>
-        </div>
-        <p class="hint">🔒 Keys are stored only in this browser (<code>chrome.storage.local</code>), are never synced, and are only sent to the provider you picked.</p>
+      <section class="intro">
+        <h2>Setup</h2>
+        <p>There's nothing to set up. AskHere opens <a href="https://claude.ai" target="_blank" rel="noopener">claude.ai</a> or <a href="https://chatgpt.com" target="_blank" rel="noopener">chatgpt.com</a> with the account you're already logged in to, the same as using them yourself, so <b>no API key and no extra cost</b>. Just make sure you're logged in.</p>
       </section>
 
       <section>
-        <h2>Answers</h2>
+        <h2>Which AI</h2>
         <label class="field">
-          <span>Answer length</span>
-          <select id="answerLength">
-            <option value="concise">Concise</option>
-            <option value="detailed">Detailed</option>
+          <span>Open</span>
+          <select id="target">
+            <option value="auto">Automatic: the AI whose site I'm on, otherwise my default</option>
+            <option value="claude">Always Claude</option>
+            <option value="chatgpt">Always ChatGPT</option>
           </select>
+          <small>You can also switch per question in the Ask box.</small>
         </label>
         <label class="field">
-          <span>Custom instructions <em>(optional)</em></span>
-          <textarea id="customInstructions" rows="3" placeholder="e.g. Answer in Hindi. I'm a beginner programmer."></textarea>
+          <span>Default AI on other websites</span>
+          <select id="defaultAI">
+            <option value="claude">Claude</option>
+            <option value="chatgpt">ChatGPT</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>The AI window</h2>
+        <label class="field">
+          <span>Size</span>
+          <select id="windowSize">
+            <option value="small">Small (420 × 600)</option>
+            <option value="medium">Medium (520 × 720)</option>
+            <option value="large">Large (680 × 860)</option>
+          </select>
+        </label>
+        <label class="check"><input id="reuseWindow" type="checkbox" /> Reuse one window. It moves next to each new question instead of opening another window.</label>
+        <label class="check"><input id="autoSend" type="checkbox" /> Send the question automatically. Turn this off to review it first.</label>
+        <label class="field">
+          <span>Add to every question <em>(optional)</em></span>
+          <textarea id="prefix" rows="2" placeholder="e.g. Answer briefly. / Answer in Hindi."></textarea>
         </label>
       </section>
 

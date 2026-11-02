@@ -1,10 +1,10 @@
 # ✦ AskHere
 
-**Highlight any text → click "Ask AI" → the answer pops up right next to it.**
+**Highlight any text → click "Ask AI" → your own Claude or ChatGPT opens in a small window right next to it, with the question already sent.**
 
-No copying into another tab. No scrolling down to the bottom of a chat and back up again. Your place on the page stays exactly where it was.
+No API key. No extra cost. It uses the Claude or ChatGPT account you're already logged in to, the same as if you'd opened it yourself. You never lose your place on the page.
 
-![AskHere answering a question about highlighted text](docs/screenshot-answer.png)
+![The AskHere question box next to highlighted text](docs/screenshot-ask-box.png)
 
 ## Why
 
@@ -12,26 +12,30 @@ When you're reading something long, like an AI chat answer, docs, or an article,
 
 1. copy the text,
 2. scroll to the chat box at the bottom (or switch tabs),
-3. ask, read the answer,
+3. paste, ask, read the answer,
 4. scroll back and find where you were.
 
-AskHere turns that into one click. The answer appears in a small panel **anchored to the text you highlighted**, and it stays glued to that text as you scroll. You can ask follow-ups in the same panel, keep several side questions open at once, and close them when you're done. Your main conversation stays clean.
+AskHere turns that into one click. Your main conversation stays clean: each side question gets its own chat in a small window placed beside the text you asked about.
+
+## How it works
+
+1. Select text on any website. A **✦ Ask AI** button appears.
+2. Click it. A small box opens next to the text. Pick **Explain / Simplify / Example / Summarize / Why?** or type your own question.
+3. A small **claude.ai** (or **chatgpt.com**) window opens right next to the text. AskHere types your question, including the quoted text, and presses send.
+4. Ask follow-ups right there in that window. The next time you ask about something, the same window moves next to the new text.
 
 ## Features
 
-- **Ask AI button** appears when you select text, on any website.
-- **Panel next to the text** that follows it when you scroll, even inside chat apps that scroll an inner container.
-- **Follow-up questions** in the same panel, with the highlighted text and surrounding paragraph as context.
-- **Quick actions:** Explain · Simplify · Example · Summarize · Why?
-- **Select text inside an answer** to ask about that part, the same way.
-- **Several panels at once.** Drag them, minimize them to a small ✦ dot, and close with `Esc`.
-- **Streaming answers** with safe Markdown rendering, plus a stop button and copy.
-- **Claude or ChatGPT.** Bring your own API key.
-- Keyboard shortcut **Alt+Shift+A** and a **right-click → Ask AI** menu.
-- Light and dark mode. The highlighted text gets a soft yellow mark while its panel is open.
-- Optionally show the button only while holding **Alt**, or turn it off on specific sites.
-
-![Follow-up questions in the same panel](docs/screenshot-followup.png)
+- Works on **any website**, including inside Claude and ChatGPT themselves.
+- **Automatic AI choice:** reading on chatgpt.com opens ChatGPT, reading on claude.ai opens Claude, and everywhere else uses your default. You can switch per question.
+- **No API key.** It just opens the normal site with your login: Free, Pro, Plus, Team, whatever you have.
+- The window is placed **below, above or beside the text**, whichever fits on screen, and kept on screen.
+- **One reusable window** by default, so you don't end up with a pile of windows.
+- Keyboard shortcut **Alt+Shift+A** and **right-click → Ask AI**.
+- Optional text added to every question (for example "Answer briefly." or "Answer in Hindi.").
+- Turn off auto-send if you'd rather review the question first.
+- Show the button only while holding **Alt**, or hide it on specific sites.
+- Light and dark mode.
 
 ## Install (from source, takes 1 minute)
 
@@ -42,28 +46,32 @@ AskHere turns that into one click. The answer appears in a small panel **anchore
 2. Open `chrome://extensions` (also works in Edge, Brave, Arc and other Chromium browsers).
 3. Turn on **Developer mode** (top right).
 4. Click **Load unpacked** and pick the `extension` folder.
-5. The settings page opens. Paste your API key:
-   - **Claude:** [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
-   - **ChatGPT / OpenAI:** [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-6. Click **Test connection**, then go highlight something.
+5. Make sure you're logged in at [claude.ai](https://claude.ai) and/or [chatgpt.com](https://chatgpt.com).
+6. Highlight something and click **✦ Ask AI**.
 
 ## Privacy
 
-- Your API key is stored only in this browser (`chrome.storage.local`). It is never synced and never sent anywhere except the provider you picked.
-- Text is sent **only when you click Ask AI** (or use the shortcut or menu). The request includes the highlighted text, a bit of the surrounding paragraph, the page title and the URL.
-- No analytics, no servers of our own. The code is all here for you to read.
+- AskHere has **no servers and no analytics**. It doesn't call any AI API.
+- When you ask, it opens claude.ai or chatgpt.com and types your question there. The question includes the highlighted text, the page title and the URL. That's exactly what you'd be sending if you copy-pasted it yourself, under your account's usual settings.
+- Nothing is sent until you click Ask (or use the shortcut or menu).
+
+## Good to know
+
+- Auto-send works by finding the chat box on claude.ai / chatgpt.com. If those sites change their page, auto-send can break. When that happens, your question is copied so you can paste it, and the fix is usually a one-line selector update in [`extension/inject.js`](extension/inject.js). Issues and PRs are welcome.
+- If you're not logged in, log in inside the window and your question is sent automatically, as long as you do it within 10 minutes.
+- Browsers don't let extensions keep a window "always on top". If you click back on the page, the AI window may go behind it. Click **Ask AI** again, or use the shortcut, to bring it back next to your text.
 
 ## Settings
 
 | Setting | Default | Notes |
 | --- | --- | --- |
-| Provider | Claude | Claude or OpenAI |
-| Claude model | Claude Opus 5.5 | Sonnet 5.5 and Haiku 5.5 are faster and cheaper; any model ID works |
-| Thinking effort (Claude) | Low | Low keeps quick answers fast. Raise it for harder questions |
-| OpenAI model | `gpt-5` | Any chat-completions model ID |
-| Answer length | Concise | or Detailed |
-| Custom instructions | none | e.g. "Answer in Hindi", "I'm a beginner" |
-| Button | On every selection | or Alt + select, or off |
+| Which AI | Automatic | Matches the site you're on, otherwise your default |
+| Default AI | Claude | or ChatGPT |
+| Window size | Medium (520 × 720) | Small / Medium / Large |
+| Reuse one window | On | Moves the window to each new question |
+| Send automatically | On | Off = the question is typed in but not sent |
+| Add to every question | none | e.g. "Answer briefly." |
+| Ask AI button | On every selection | or Alt + select, or off |
 | Disabled sites | none | Hides the button on those domains |
 
 ## Development
@@ -71,8 +79,8 @@ AskHere turns that into one click. The answer appears in a small panel **anchore
 No build step. The `extension/` folder is the extension.
 
 ```bash
-npm test            # unit tests: markdown renderer, SSE parser, prompt builder
-npm run test:e2e    # loads the extension in Chromium with a mocked API and clicks through it
+npm test            # unit tests: window placement, prompt, AI choice
+npm run test:e2e    # loads the extension in Chromium and runs the full flow against a fake claude.ai page
 npm run zip         # packages extension/ into askhere.zip for the Chrome Web Store
 ```
 
@@ -80,13 +88,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout.
 
 ## Roadmap
 
+- [ ] Gemini support
 - [ ] Firefox build
-- [ ] Remember panels per page, so you can come back to your side questions later
-- [ ] "Send this side thread back to the main chat" on ChatGPT, Claude and Gemini
-- [ ] Local models through Ollama
+- [ ] Optional side-panel mode (AI docked at the side of the browser)
 - [ ] Desktop app (Windows/macOS) that works in any app, not just the browser
-
-Ideas and PRs are welcome. Open an issue.
 
 ## License
 

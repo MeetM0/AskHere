@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Fake Claude</title>
+    <style>
+      body { font: 15px system-ui; margin: 0; padding: 16px; background: #f5f3ef; }
+      .composer { min-height: 60px; padding: 10px; border: 1px solid #ccc; border-radius: 12px; background: #fff; white-space: pre-wrap; }
+      #sent { margin-top: 12px; white-space: pre-wrap; color: #444; }
+    </style>
+  </head>
+  <body>
+    <!-- Mimics claude.ai's composer: a contenteditable editor that appears late, plus a Send button. -->
+    <div id="app">Loading…</div>
+    <script>
+      setTimeout(() => {
+        document.getElementById('app').innerHTML =
+          '<fieldset><div class="ProseMirror composer" contenteditable="true" data-testid="chat-input" role="textbox"></div></fieldset>' +
+          '<button aria-label="Send message" disabled>Send</button><div id="sent"></div>';
+        const box = document.querySelector('[contenteditable]');
+        const btn = document.querySelector('button');
+        box.addEventListener('input', () => (btn.disabled = !box.innerText.trim()));
+        btn.addEventListener('click', () => {
+          document.getElementById('sent').textContent = box.innerText;
+          document.body.dataset.sent = box.innerText;
+          box.innerHTML = '';
+          btn.disabled = true;
+        });
+      }, 700);
+    </script>
+  </body>
+</html>

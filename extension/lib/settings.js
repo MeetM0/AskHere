@@ -1,25 +1,38 @@
-// Shared settings defaults. Stored in chrome.storage.local (never synced),
-// so API keys stay on this device only.
+// Shared settings defaults (chrome.storage.local).
 
 export const DEFAULTS = {
-  provider: 'anthropic', // 'anthropic' | 'openai'
-  anthropicKey: '',
-  anthropicModel: 'claude-opus-5-5',
-  openaiKey: '',
-  openaiModel: 'gpt-5',
-  effort: 'low', // Claude only: 'low' | 'medium' | 'high' — lower is faster & cheaper
-  answerLength: 'concise', // 'concise' | 'detailed'
-  customInstructions: '',
+  // Which AI to open. 'auto' = the one whose site you're on (reading on
+  // chatgpt.com -> ChatGPT, on claude.ai -> Claude), otherwise `defaultAI`.
+  target: 'auto', // 'auto' | 'claude' | 'chatgpt'
+  defaultAI: 'claude', // 'claude' | 'chatgpt'
+  windowSize: 'medium', // 'small' | 'medium' | 'large'
+  reuseWindow: true, // move & reuse one AskHere window instead of opening many
+  autoSend: true, // press send for you
+  prefix: '', // text added to every question, e.g. "Answer briefly."
   triggerMode: 'button', // 'button' | 'alt' | 'off'
   disabledSites: '', // newline-separated hostnames
 };
 
-export const ANTHROPIC_MODELS = [
-  { id: 'claude-opus-5-5', label: 'Claude Opus 5.5 (smartest)' },
-  { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5 (balanced)' },
-  { id: 'claude-haiku-5-5', label: 'Claude Haiku 5.5 (fastest, cheapest)' },
-];
+export const AI_SITES = {
+  claude: { name: 'Claude', url: 'https://claude.ai/new' },
+  chatgpt: { name: 'ChatGPT', url: 'https://chatgpt.com/' },
+};
+
+export const WINDOW_SIZES = {
+  small: { width: 420, height: 600 },
+  medium: { width: 520, height: 720 },
+  large: { width: 680, height: 860 },
+};
 
 export async function getSettings() {
   return chrome.storage.local.get(DEFAULTS);
+}
+
+/** Pick which AI to open for a question asked on `hostname`. */
+export function resolveTarget(settings, hostname = '') {
+  if (settings.target === 'claude' || settings.target === 'chatgpt') return settings.target;
+  const host = hostname.replace(/^www\./, '');
+  if (host === 'claude.ai' || host.endsWith('.claude.ai')) return 'claude';
+  if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'chat.openai.com') return 'chatgpt';
+  return settings.defaultAI === 'chatgpt' ? 'chatgpt' : 'claude';
 }

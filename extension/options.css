@@ -203,3 +203,20 @@ footer {
   margin-top: 16px;
   color: var(--muted);
 }
+
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 10px 0;
+  cursor: pointer;
+}
+
+.check input {
+  margin-top: 4px;
+  accent-color: var(--accent);
+}
+
+.intro p {
+  margin: 0;
+}

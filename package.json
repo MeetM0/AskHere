@@ -1,8 +1,8 @@
 {
   "name": "askhere",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Highlight text anywhere and ask AI in a small popup right next to it.",
+  "description": "Highlight text anywhere and ask your own Claude or ChatGPT in a small window right next to it.",
   "license": "MIT",
   "type": "module",
   "scripts": {
