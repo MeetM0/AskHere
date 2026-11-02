@@ -6,8 +6,9 @@ export const DEFAULTS = {
   target: 'auto', // 'auto' | 'claude' | 'chatgpt'
   defaultAI: 'claude', // 'claude' | 'chatgpt'
   // Where the AI opens: 'auto' = small window, except in fullscreen on a Mac
-  // (a window would jump to another desktop Space) where the side panel is used.
-  openIn: 'auto', // 'auto' | 'window' | 'sidepanel'
+  // (a window would jump to another desktop Space) where the floating
+  // picture-in-picture window is used.
+  openIn: 'auto', // 'auto' | 'window' | 'pip' | 'sidepanel'
   windowSize: 'small', // 'small' | 'medium' | 'large'
   compactWindow: true, // hide the AI site's sidebar/header and brand the window as AskHere
   reuseWindow: true, // move & reuse one AskHere window instead of opening many

@@ -17,6 +17,10 @@
         login     - logged out: no editor, just a "Log in" header
         rerender  - the editor element is replaced right after it first gets text
         nobutton  - no Send button; Enter sends
+        noreply   - accepts the question but never answers
+      After sending, the fake streams an answer the way the real sites do:
+      Claude: <div data-is-streaming="true|false">, ChatGPT: [data-message-author-role="assistant"]
+      plus a Stop button while streaming.
     -->
     <div id="app">Loading…</div>
     <script>
@@ -33,12 +37,50 @@
       const sidebar = SITE === 'claude' ? '<nav id="side">Chats sidebar</nav>' : '<div id="stage-slideover-sidebar">Chats sidebar</div>';
       const topBar = SITE === 'claude' ? '<header id="top">Chat title · Share</header>' : '<div id="page-header">ChatGPT 5 ▾</div>';
 
+      let replies = 0;
       function sendText(box) {
         const text = box.innerText;
         if (!text.trim()) return;
         document.getElementById('sent').textContent = text;
         document.body.dataset.sent = text;
         box.innerHTML = '';
+        if (MODE !== 'noreply') streamReply(text.trim().split('\n').pop());
+      }
+
+      function streamReply(lastLine) {
+        const n = ++replies;
+        const wrap = document.createElement('div');
+        const body = document.createElement('div');
+        if (SITE === 'claude') {
+          wrap.setAttribute('data-is-streaming', 'true');
+          body.className = 'font-claude-response';
+        } else {
+          wrap.setAttribute('data-message-author-role', 'assistant');
+          const stop = document.createElement('button');
+          stop.setAttribute('data-testid', 'stop-button');
+          stop.textContent = 'Stop';
+          document.getElementById('app').append(stop);
+        }
+        wrap.append(body);
+        document.getElementById('app').append(wrap);
+        const p = document.createElement('p');
+        p.append('Answer ' + n + ' to: ');
+        const strong = document.createElement('strong');
+        strong.textContent = lastLine;
+        p.append(strong);
+        const stages = [
+          () => body.append(p),
+          () => body.insertAdjacentHTML('beforeend', '<ul><li>first point</li><li>second <em>point</em></li></ul>'),
+          () => body.insertAdjacentHTML('beforeend',
+            '<div class="code"><span class="lang">python</span><button>Copy</button><pre><code>x = 1</code></pre></div>' +
+            '<img src="x" onerror="window.__pwned=1"><svg><text>svgtext</text></svg>' +
+            '<a href="javascript:alert(1)">bad link</a> <a href="https://example.com/doc">good link</a>'),
+        ];
+        stages.forEach((fn, i) => setTimeout(fn, 250 * (i + 1)));
+        setTimeout(() => {
+          if (SITE === 'claude') wrap.setAttribute('data-is-streaming', 'false');
+          else document.querySelector('[data-testid="stop-button"]')?.remove();
+        }, 250 * (stages.length + 1));
       }
 
       function wire() {

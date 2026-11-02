@@ -14,20 +14,20 @@ function fakeWindow({ platform, uaPlatform, outer, screen, fullscreenElement = n
   };
 }
 
-test('Mac, Chrome fullscreen (green button) -> side panel', () => {
+test('Mac, Chrome fullscreen (green button) -> floating window', () => {
   const env = detectEnv(fakeWindow({ uaPlatform: 'macOS', outer: [1512, 982], screen: [1512, 982] }));
   assert.deepEqual(env, { isMac: true, isFullscreen: true });
-  assert.equal(chooseOpenIn('auto', env), 'sidepanel');
+  assert.equal(chooseOpenIn('auto', env), 'pip');
 });
 
 test('Mac, older Chrome without userAgentData -> still detected', () => {
   const env = detectEnv(fakeWindow({ platform: 'MacIntel', outer: [1440, 900], screen: [1440, 900] }));
-  assert.equal(chooseOpenIn('auto', env), 'sidepanel');
+  assert.equal(chooseOpenIn('auto', env), 'pip');
 });
 
-test('Mac, a video/page element in fullscreen -> side panel', () => {
+test('Mac, a video/page element in fullscreen -> floating window', () => {
   const env = detectEnv(fakeWindow({ uaPlatform: 'macOS', outer: [1200, 800], screen: [1512, 982], fullscreenElement: {} }));
-  assert.equal(chooseOpenIn('auto', env), 'sidepanel');
+  assert.equal(chooseOpenIn('auto', env), 'pip');
 });
 
 test('Mac, normal or "zoomed" window (not fullscreen) -> small window', () => {
@@ -53,11 +53,18 @@ test('Linux / ChromeOS fullscreen -> small window', () => {
   assert.equal(chooseOpenIn('auto', detectEnv(fakeWindow({ uaPlatform: 'Chrome OS', outer: [1366, 768], screen: [1366, 768] }))), 'window');
 });
 
+test('notch MacBook in fullscreen: background passes the real window state, still floating window', () => {
+  // outerHeight is shorter than the screen on notched MacBooks, so page-side
+  // size checks miss it; the background asks Chrome for the window state instead.
+  assert.equal(chooseOpenIn('auto', { isMac: true, isFullscreen: true }), 'pip');
+});
+
 test('explicit setting always wins', () => {
   const macFs = { isMac: true, isFullscreen: true };
   const winNormal = { isMac: false, isFullscreen: false };
   assert.equal(chooseOpenIn('window', macFs), 'window');
   assert.equal(chooseOpenIn('sidepanel', winNormal), 'sidepanel');
+  assert.equal(chooseOpenIn('pip', winNormal), 'pip');
 });
 
 test('missing pieces never throw', () => {

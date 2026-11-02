@@ -273,6 +273,7 @@
 
     shadow.append(el);
     box = { el, cap, placement: null };
+    prefetchWhere();
     positionBox();
     requestAnimationFrame(() => {
       positionBox();
@@ -300,7 +301,87 @@
   }
 
   // ---------- hand off to the background: open the AI window near the text ----------
+  // Where the answer will show (small window / floating window / side panel).
+  // Asked as soon as the box opens so it's known by the time you click: the
+  // floating window must be opened during the click itself.
+  let where = null;
+  function localGuess() {
+    const mode = globalThis.AskHereMode;
+    return mode ? mode.chooseOpenIn(prefs.openIn, mode.detectEnv(window)) : 'window';
+  }
+  function prefetchWhere() {
+    where = null;
+    try {
+      chrome.runtime
+        .sendMessage({ type: 'askhere:where', pageFullscreen: !!document.fullscreenElement })
+        .then((r) => {
+          if (r?.openIn) where = r.openIn;
+        })
+        .catch(() => {});
+    } catch {
+      /* extension reloaded */
+    }
+  }
+
+  const AI_LABEL = { claude: 'Claude', chatgpt: 'ChatGPT' };
+  const pipHandlers = (ai) => ({
+    onFollowup: (text) => {
+      chrome.runtime
+        .sendMessage({ type: 'askhere:followup', text })
+        .then((r) => {
+          if (!r?.ok) globalThis.AskHerePip.current()?.setStatus('closed', 'The chat was closed. Ask again from the page.');
+        })
+        .catch(() => {});
+    },
+    onShowTab: () => chrome.runtime.sendMessage({ type: 'askhere:show-ai' }).catch(() => {}),
+    onClose: () => chrome.runtime.sendMessage({ type: 'askhere:pip-closed' }).catch(() => {}),
+    ai,
+  });
+
+  // Answers coming back from the chat tab, shown in the floating window.
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg?.type !== 'askhere:mirror') return;
+      const pip = globalThis.AskHerePip?.current();
+      if (!pip) return;
+      if (msg.status) {
+        const text = msg.status === 'closed' ? 'The chat tab was closed. Ask again from the page.' : msg.text || 'Something went wrong.';
+        pip.setStatus(msg.status, text);
+      } else if (msg.tree) {
+        pip.setAnswer(msg.tree, !!msg.done);
+      }
+    });
+  } catch {
+    /* extension reloaded */
+  }
+
   function send(cap, question, ai) {
+    let openIn = where || localGuess();
+    if (openIn === 'pip') {
+      const Pip = globalThis.AskHerePip;
+      if (Pip?.supported()) {
+        const quote = cap.text.trim();
+        // Must run now, during the click, or the browser refuses to open it.
+        Pip.open(pipHandlers(ai))
+          .then((pip) => {
+            pip.newChat({ aiName: AI_LABEL[ai] || 'Claude', quote });
+            pip.addQuestion(question);
+            dispatch(cap, question, ai, 'pip');
+          })
+          .catch((err) => {
+            console.warn('AskHere: floating window failed, using the side panel', err);
+            dispatch(cap, question, ai, 'sidepanel');
+          });
+        window.getSelection()?.removeAllRanges();
+        return;
+      }
+      openIn = 'sidepanel'; // browser without picture-in-picture support
+    }
+    dispatch(cap, question, ai, openIn);
+    window.getSelection()?.removeAllRanges();
+  }
+
+  function dispatch(cap, question, ai, openIn) {
     const r = cap.anchor.getRect();
     // Convert viewport coordinates to screen coordinates so the AI window can
     // be placed right next to the text. The browser's toolbar height is
@@ -308,8 +389,6 @@
     const toolbar = Math.max(0, window.outerHeight - window.innerHeight);
     const sx = window.screenX;
     const sy = window.screenY + toolbar;
-    const mode = globalThis.AskHereMode;
-    const openIn = mode ? mode.chooseOpenIn(prefs.openIn, mode.detectEnv(window)) : 'window';
     const message = {
       type: 'askhere:ask',
       openIn,
@@ -332,7 +411,6 @@
     } catch {
       notice('AskHere was updated. Refresh this page to use it.');
     }
-    window.getSelection()?.removeAllRanges();
   }
 
   function notice(text) {

@@ -3,15 +3,15 @@
 
 (function () {
   /**
-   * @param {'auto'|'window'|'sidepanel'} openIn  the user's setting
+   * @param {'auto'|'window'|'pip'|'sidepanel'} openIn  the user's setting
    * @param {{isMac:boolean, isFullscreen:boolean}} env
    */
   function chooseOpenIn(openIn, env) {
-    if (openIn === 'window' || openIn === 'sidepanel') return openIn;
-    // On macOS a fullscreen app has its own Space; a new window can't appear on
-    // top of it and would yank you to the desktop. The side panel lives inside
-    // the fullscreen window instead.
-    return env.isMac && env.isFullscreen ? 'sidepanel' : 'window';
+    if (openIn === 'window' || openIn === 'pip' || openIn === 'sidepanel') return openIn;
+    // On macOS a fullscreen app has its own Space; a normal window can't appear
+    // on top of it and would yank you to the desktop. A picture-in-picture
+    // window floats above fullscreen apps, so use that there.
+    return env.isMac && env.isFullscreen ? 'pip' : 'window';
   }
 
   /** Read the environment from a page (window/screen/navigator/document). */

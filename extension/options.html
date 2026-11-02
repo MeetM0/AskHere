@@ -46,11 +46,12 @@
         <label class="field">
           <span>Open in</span>
           <select id="openIn">
-            <option value="auto">Automatic: small window, or the side panel when Chrome is fullscreen on a Mac</option>
-            <option value="window">Always a small window</option>
+            <option value="auto">Automatic: small window, or a floating window when Chrome is fullscreen on a Mac</option>
+            <option value="window">Always a small window next to the text</option>
+            <option value="pip">Always a floating window (picture-in-picture)</option>
             <option value="sidepanel">Always Chrome's side panel</option>
           </select>
-          <small>On a Mac, a fullscreen app has its own desktop Space, so a separate window would take you out of fullscreen. The side panel stays inside it.</small>
+          <small>On a Mac, a fullscreen app has its own desktop Space, so a normal window would take you out of fullscreen. The floating window stays on top of everything instead. Your chat runs in a background tab and its answer is shown in the floating window.</small>
         </label>
         <label class="field">
           <span>Size</span>

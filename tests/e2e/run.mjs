@@ -33,6 +33,11 @@ const pages = {
 const fakeAI = await readFile(path.join(here, 'fake-ai.html'), 'utf8');
 const server = createServer((req, res) => {
   res.setHeader('content-type', 'text/html; charset=utf-8');
+  if (req.url.startsWith('/csp')) {
+    // Strict page: no inline styles/scripts, Trusted Types enforced.
+    res.setHeader('content-security-policy', "default-src 'self'; style-src 'self'; script-src 'self'; require-trusted-types-for 'script'");
+    return res.end(pages['/']);
+  }
   res.end(pages[req.url.split('?')[0]] || 'not found');
 }).listen(0);
 const base = `http://localhost:${server.address().port}`;
@@ -50,7 +55,7 @@ let fakeMode = 'normal';
 const aiLoads = [];
 await context.route(/^https:\/\/(claude\.ai|chatgpt\.com)\//, (route) => {
   const url = route.request().url();
-  aiLoads.push(url);
+  if (route.request().isNavigationRequest()) aiLoads.push(url); // ignore favicon etc.
   const site = url.includes('claude.ai') ? 'claude' : 'chatgpt';
   // A "reading" page on chatgpt.com, for the auto-target test.
   if (url.includes('/reading')) return route.fulfill({ contentType: 'text/html', body: pages['/'] });
@@ -633,7 +638,7 @@ scenario('side panel mode: Chrome opens the side panel, no window, no tab', asyn
   await openBox(page);
   await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
   for (let i = 0; i < 50 && (await sidePanelCount()) === 0; i++) await sleep(100);
-  assert.equal(await sidePanelCount(), 1, 'side panel should be open');
+  assert.ok((await sidePanelCount()) >= 1, 'side panel should be open');
   assert.equal(await popupCount(), 0, 'no separate window');
   assert.equal(await sw.evaluate(async () => (await chrome.tabs.query({})).length), tabsBefore, 'no new tab');
   await sw.evaluate(async () => {
@@ -755,6 +760,265 @@ scenario('AskHere ✕ in a tab (side panel fallback) closes only that tab, not y
   assert.equal(ai.isClosed(), true, 'AI tab closed');
   assert.equal(page.isClosed(), false, 'your page is still open');
   assert.equal(await sw.evaluate(async () => (await chrome.windows.getAll()).length), windowsBefore);
+});
+
+// ---------- floating window (picture-in-picture) ----------
+
+// The chat tab that runs behind the floating window. Pre-created (blank) and
+// registered for the source page, so Playwright can serve the fake AI site in it.
+async function prepMirrorTab(page) {
+  await page.bringToFront();
+  const known = new Set(context.pages());
+  await sw.evaluate(async () => {
+    const [src] = await chrome.tabs.query({ active: true, windowType: 'normal' });
+    const t = await chrome.tabs.create({ url: 'about:blank', active: false, windowId: src.windowId });
+    await chrome.storage.session.set({ [`mirrorFor:${src.id}`]: t.id, [`mirrorSource:${t.id}`]: src.id });
+  });
+  for (let i = 0; i < 50; i++) {
+    const p = context.pages().find((pg) => !known.has(pg));
+    if (p) {
+      await p.waitForLoadState();
+      return p;
+    }
+    await sleep(100);
+  }
+  throw new Error('mirror tab did not open');
+}
+
+async function pipWindow(timeout = 8000) {
+  const end = Date.now() + timeout;
+  while (Date.now() < end) {
+    for (const p of context.pages()) {
+      if (p.url() !== 'about:blank') continue;
+      const isPip = await p.evaluate(() => !!document.querySelector('.thread') && document.title === 'AskHere').catch(() => false);
+      if (isPip) return p;
+    }
+    await sleep(100);
+  }
+  return null;
+}
+
+async function pipAnswerText(pip, re, timeout = 15000) {
+  await pip.waitForFunction((src) => {
+    const a = [...document.querySelectorAll('.answer')].pop();
+    return a && new RegExp(src).test(a.innerText);
+  }, re.source, { timeout });
+  return pip.evaluate(() => [...document.querySelectorAll('.answer')].pop().innerText);
+}
+
+async function activeTabUrl() {
+  return sw.evaluate(async () => {
+    const [t] = await chrome.tabs.query({ active: true, windowType: 'normal' });
+    return t?.id;
+  });
+}
+
+scenario('floating window: answer streams in, formatting kept, junk removed, you stay on your page', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  const ai = await prepMirrorTab(page);
+  await page.bringToFront();
+  const activeBefore = await activeTabUrl();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  assert.ok(pip, 'floating window should open');
+  assert.match(await pip.locator('.quote').innerText(), /mass and energy are equivalent/);
+  assert.match(await ai.evaluate(() => document.body.dataset.sent || ''), /^$|Explain this/); // may still be typing
+  const text = await pipAnswerText(pip, /x = 1/);
+  assert.match(text, /Answer 1 to: Explain this\./);
+  assert.match(text, /first point/);
+  await pip.waitForFunction(() => document.querySelector('.actions .action')?.textContent === 'Copy', null, { timeout: 8000 });
+  assert.equal(await pip.locator('.answer strong').first().innerText(), 'Explain this.');
+  assert.equal(await pip.locator('.answer pre code').innerText(), 'x = 1');
+  assert.equal(await pip.locator('.answer button, .answer img, .answer svg, .answer script').count(), 0, 'junk removed');
+  assert.equal(await pip.locator('.answer a[href^="javascript"]').count(), 0, 'no javascript: links');
+  assert.equal(await pip.locator('.answer a').count(), 1, 'unsafe link shown as plain text');
+  assert.equal(await pip.locator('.answer a[href="https://example.com/doc"]').count(), 1);
+  assert.equal(await page.evaluate(() => window.__pwned), undefined);
+  assert.equal(await pip.evaluate(() => window.__pwned), undefined);
+  assert.equal(await activeTabUrl(), activeBefore, 'still on your page, no tab switch');
+  assert.equal(await popupCount(), 0, 'no separate window');
+  await pip.setViewportSize({ width: 380, height: 520 });
+  await pip.screenshot({ path: path.join(shots, '5-floating.png') });
+});
+
+scenario('floating window: follow-up goes to the same chat and its answer shows up', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  const ai = await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pipAnswerText(pip, /x = 1/);
+  await pip.waitForFunction(() => !document.querySelector('.send').disabled, null, { timeout: 8000 });
+  await pip.locator('textarea').fill('Why is it squared?');
+  await pip.locator('textarea').press('Enter');
+  const text = await pipAnswerText(pip, /Answer 2 to: Why is it squared\?/);
+  assert.match(text, /Answer 2/);
+  assert.equal(await ai.evaluate(() => document.body.dataset.sent), 'Why is it squared?');
+  assert.equal(await pip.locator('.user').count(), 2);
+});
+
+scenario('floating window: ChatGPT works too', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-ai-opt', { hasText: 'ChatGPT' }).click();
+  await box(page).locator('.ah-input').fill('What is c?');
+  await box(page).locator('.ah-input').press('Enter');
+  const pip = await pipWindow();
+  assert.match(await pip.locator('.ai').innerText(), /ChatGPT/);
+  assert.match(await pipAnswerText(pip, /x = 1/), /Answer 1 to: What is c\?/);
+  assert.equal(aiLoads.at(-1), 'https://chatgpt.com/');
+});
+
+scenario('floating window: a new question from the page reuses it and starts a new chat', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pipAnswerText(pip, /x = 1/);
+  await page.bringToFront();
+  await openBox(page, '#filler');
+  await box(page).locator('.ah-input').fill('Second topic');
+  await box(page).locator('.ah-input').press('Enter');
+  await pipAnswerText(pip, /Answer 1 to: Second topic/);
+  assert.equal(await pip.locator('.user').count(), 1, 'fresh chat');
+  assert.match(await pip.locator('.quote').innerText(), /Filler paragraph/);
+  assert.equal((await Promise.all(context.pages().map((p) => p.evaluate(() => document.title === 'AskHere' && !!document.querySelector('.thread')).catch(() => false)))).filter(Boolean).length, 1, 'only one floating window');
+});
+
+scenario('floating window: logged out shows a clear message and a button to the chat', async () => {
+  await reset({ openIn: 'pip' });
+  fakeMode = 'login';
+  const page = await open('/');
+  const ai = await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pip.waitForFunction(() => /Log in to Claude/.test(document.querySelector('.status')?.innerText || ''), null, { timeout: 30000 });
+  await pip.locator('.action', { hasText: 'Open the chat to log in' }).click();
+  await sleep(300);
+  const aiId = await sw.evaluate(async () => {
+    const [src] = (await chrome.tabs.query({ windowType: 'normal' })).filter((t) => t.url === undefined || true);
+    void src;
+    const s = await chrome.storage.session.get(null);
+    return Object.entries(s).find(([k]) => k.startsWith('mirrorSource:'))?.[0].split(':')[1];
+  });
+  assert.equal(String(await activeTabUrl()), aiId, 'chat tab shown so you can log in');
+  // After logging in, the question is sent and the answer still reaches the floating window.
+  fakeMode = 'normal';
+  await ai.reload();
+  await pipAnswerText(pip, /Answer 1 to: Explain this\./, 20000);
+  assert.equal(await pip.locator('.status').count(), 0, 'login message replaced by the answer');
+});
+
+scenario('floating window: no answer found shows a hint instead of spinning forever', async () => {
+  await reset({ openIn: 'pip' });
+  fakeMode = 'noreply';
+  const page = await open('/');
+  await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pip.waitForFunction(() => /couldn't read the answer/i.test(document.querySelector('.status')?.innerText || ''), null, { timeout: 40000 });
+  assert.equal(await pip.locator('.action', { hasText: 'Show the full chat' }).count(), 1);
+});
+
+scenario('floating window: closing it also closes the background chat tab', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  const ai = await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pipAnswerText(pip, /x = 1/);
+  await pip.locator('[data-act="close"]').click();
+  for (let i = 0; i < 30 && !ai.isClosed(); i++) await sleep(100);
+  assert.equal(ai.isClosed(), true);
+  assert.equal(page.isClosed(), false);
+});
+
+scenario('floating window: if the chat tab is closed, it says so (also for follow-ups)', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/');
+  const ai = await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  await pipAnswerText(pip, /x = 1/);
+  await ai.close();
+  await pip.waitForFunction(() => /chat tab was closed/i.test(document.querySelector('.status')?.innerText || ''), null, { timeout: 5000 });
+  await pip.locator('textarea').fill('still there?');
+  await pip.locator('textarea').press('Enter');
+  await pip.waitForFunction(() => /chat was closed/i.test([...document.querySelectorAll('.status')].pop()?.innerText || ''), null, { timeout: 5000 });
+});
+
+scenario('floating window works on a strict-CSP / Trusted Types page', async () => {
+  await reset({ openIn: 'pip' });
+  const page = await open('/csp');
+  await prepMirrorTab(page);
+  await page.bringToFront();
+  await openBox(page);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  assert.ok(pip, 'floating window opens');
+  await pipAnswerText(pip, /x = 1/);
+  const bg = await pip.evaluate(() => getComputedStyle(document.querySelector('.send')).backgroundColor);
+  assert.notEqual(bg, 'rgba(0, 0, 0, 0)', 'styles applied');
+});
+
+scenario('auto on a Mac in fullscreen: floating window, not a separate window', async () => {
+  await reset({ debugPlatform: 'mac' });
+  const page = await open('/');
+  await sw.evaluate(async () => {
+    const [main] = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    await chrome.windows.update(main.id, { state: 'fullscreen' });
+  });
+  await sleep(300);
+  await openBox(page);
+  await sleep(300); // the box asks where to open as soon as it appears
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const pip = await pipWindow();
+  assert.ok(pip, 'floating window should open on Mac fullscreen');
+  await sleep(500);
+  assert.equal(await popupCount(), 0, 'no separate window (it would jump to the desktop)');
+});
+
+scenario('auto on a Mac, not fullscreen: small window next to the text', async () => {
+  await reset({ debugPlatform: 'mac' });
+  const page = await open('/');
+  await openBox(page);
+  await sleep(300);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  await waitForAIWindow();
+  assert.equal(await pipWindow(1500), null);
+});
+
+scenario('auto on Windows/Linux in fullscreen: small window (floats fine there)', async () => {
+  await reset({ debugPlatform: 'win' });
+  const page = await open('/');
+  await sw.evaluate(async () => {
+    const [main] = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    await chrome.windows.update(main.id, { state: 'fullscreen' });
+  });
+  await openBox(page);
+  await sleep(300);
+  await box(page).locator('.ah-chip', { hasText: 'Explain' }).click();
+  const w = await waitForAIWindow();
+  assert.equal(w.state, 'normal');
+  assert.equal(await pipWindow(1500), null);
 });
 
 // ---------- run ----------

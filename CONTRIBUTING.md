@@ -15,9 +15,11 @@ Thanks for helping! AskHere is plain JavaScript with **no build step**, so getti
 | `extension/content.js` | Runs on every page: the **Ask AI** button and the small question box next to the text |
 | `extension/panel.css` | Styles for that UI (inside a shadow root so sites can't break them) |
 | `extension/background.js` | Service worker: opens or moves the Claude/ChatGPT popup window next to the text and remembers the question for it |
-| `extension/inject.js` | Runs on claude.ai / chatgpt.com: types the question into the chat box and presses send |
+| `extension/inject.js` | Runs on claude.ai / chatgpt.com: types the question, presses send, and (floating mode) reads the answer as it streams |
 | `extension/sidepanel.*` | Side panel used in Mac fullscreen: shows claude.ai / chatgpt.com in a frame and hands the question to it |
-| `extension/lib/mode.js` | Decides small window vs side panel (Mac + fullscreen → side panel) |
+| `extension/pip-ui.js` | The floating picture-in-picture window (used in Mac fullscreen) |
+| `extension/lib/sanitize.js` | Turns an AI answer into safe plain data and back (no HTML strings) |
+| `extension/lib/mode.js` | Decides small window vs floating window vs side panel (Mac + fullscreen → floating) |
 | `extension/lib/placement.js` | Works out where on screen the window goes |
 | `extension/lib/windows.js` | Opens/reuses the window and keeps it small and normal (also when Chrome is fullscreen or maximized) |
 | `extension/lib/prompt.js` | Builds the message that gets sent |

@@ -8,6 +8,9 @@ import { getSettings, resolveTarget, AI_SITES, WINDOW_SIZES } from './lib/settin
 import { buildPrompt } from './lib/prompt.js';
 import { placeWindow } from './lib/placement.js';
 import { openAIWindow, isAskTab, markAskTab, openFull } from './lib/windows.js';
+import './lib/mode.js'; // classic script: sets globalThis.AskHereMode
+
+const { chooseOpenIn } = globalThis.AskHereMode;
 
 const MENU_ID = 'askhere-ask';
 const PENDING_TTL_MS = 10 * 60 * 1000;
@@ -91,6 +94,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     );
     return true; // async response
   }
+  if (msg?.type === 'askhere:where') {
+    whereToOpen(msg, sender).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === 'askhere:mirror' && sender.tab) {
+    relayMirror(sender.tab.id, msg);
+  }
+  if (msg?.type === 'askhere:followup' && sender.tab) {
+    followup(sender.tab.id, msg.text).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === 'askhere:show-ai' && sender.tab) {
+    showMirrorTab(sender.tab.id);
+  }
+  if (msg?.type === 'askhere:pip-closed' && sender.tab) {
+    closeMirrorTab(sender.tab.id);
+  }
   if (msg?.type === 'askhere:take-pending') {
     takePending(sender.tab?.id).then(sendResponse);
     return true;
@@ -129,6 +149,115 @@ async function windowInfo(tabId) {
   return { isAskWindow: true, compact: settings.compactWindow };
 }
 
+// ---------- where to show the AI ----------
+// Asked when the Ask box opens. Uses what Chrome itself knows (is this window
+// fullscreen? is this a Mac?) rather than guessing from screen sizes, which
+// fails e.g. on MacBooks with a notch.
+async function whereToOpen(msg, sender) {
+  const settings = await getSettings();
+  let isMac = false;
+  let isFullscreen = !!msg.pageFullscreen;
+  try {
+    // debugPlatform lets the automated tests pretend to be a Mac.
+    const { debugPlatform } = await chrome.storage.local.get('debugPlatform');
+    isMac = (debugPlatform || (await chrome.runtime.getPlatformInfo()).os) === 'mac';
+  } catch {
+    /* ignore */
+  }
+  try {
+    if ((await chrome.windows.get(sender.tab.windowId)).state === 'fullscreen') isFullscreen = true;
+  } catch {
+    /* ignore */
+  }
+  return { openIn: chooseOpenIn(settings.openIn, { isMac, isFullscreen }), isMac, isFullscreen };
+}
+
+// ---------- floating window (picture-in-picture) mode ----------
+// Your Claude/ChatGPT runs in a background tab of the same window (so you stay
+// logged in and never leave fullscreen). inject.js there reads the answer and
+// sends it here; we pass it on to the page that shows the floating window.
+
+async function getSession(key) {
+  return (await chrome.storage.session.get(key))[key];
+}
+
+async function mirrorTabFor(sourceTabId) {
+  const tabId = await getSession(`mirrorFor:${sourceTabId}`);
+  if (tabId == null) return null;
+  try {
+    await chrome.tabs.get(tabId);
+    return tabId;
+  } catch {
+    await chrome.storage.session.remove(`mirrorFor:${sourceTabId}`);
+    return null;
+  }
+}
+
+async function openMirrorTab(sourceTab, url) {
+  const existing = await mirrorTabFor(sourceTab.id);
+  if (existing != null) {
+    await chrome.tabs.update(existing, { url });
+    await markAskTab(existing);
+    return existing;
+  }
+  const tab = await chrome.tabs.create({
+    windowId: sourceTab.windowId,
+    index: sourceTab.index + 1,
+    url,
+    active: false, // stays in the background: no Space switch, no tab switch
+  });
+  await chrome.storage.session.set({ [`mirrorFor:${sourceTab.id}`]: tab.id, [`mirrorSource:${tab.id}`]: sourceTab.id });
+  await markAskTab(tab.id);
+  return tab.id;
+}
+
+async function relayMirror(aiTabId, msg) {
+  const source = await getSession(`mirrorSource:${aiTabId}`);
+  if (source == null) return;
+  const { type, ...payload } = msg;
+  chrome.tabs.sendMessage(source, { type: 'askhere:mirror', ...payload }).catch(() => {});
+}
+
+async function followup(sourceTabId, text) {
+  const aiTab = await mirrorTabFor(sourceTabId);
+  if (aiTab == null) return { ok: false };
+  try {
+    await chrome.tabs.sendMessage(aiTab, { type: 'askhere:followup', text: String(text || '') });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+async function showMirrorTab(sourceTabId) {
+  const aiTab = await mirrorTabFor(sourceTabId);
+  if (aiTab != null) await chrome.tabs.update(aiTab, { active: true });
+}
+
+async function closeMirrorTab(sourceTabId) {
+  const aiTab = await mirrorTabFor(sourceTabId);
+  await chrome.storage.session.remove(`mirrorFor:${sourceTabId}`);
+  if (aiTab != null) {
+    await chrome.storage.session.remove(`mirrorSource:${aiTab}`);
+    await chrome.tabs.remove(aiTab).catch(() => {});
+  }
+}
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  // The chat tab was closed: tell the floating window.
+  const source = await getSession(`mirrorSource:${tabId}`);
+  if (source != null) {
+    await chrome.storage.session.remove([`mirrorSource:${tabId}`, `mirrorFor:${source}`]);
+    chrome.tabs.sendMessage(source, { type: 'askhere:mirror', status: 'closed' }).catch(() => {});
+  }
+  // The page with the floating window was closed: close its chat tab too.
+  const aiTab = await getSession(`mirrorFor:${tabId}`);
+  if (aiTab != null) {
+    await chrome.storage.session.remove([`mirrorFor:${tabId}`, `mirrorSource:${aiTab}`]);
+    chrome.tabs.remove(aiTab).catch(() => {});
+  }
+});
+
 // ---------- asking ----------
 
 // Questions are handled one at a time, so two quick clicks can't open two
@@ -148,6 +277,12 @@ async function askNow(msg, sender, panelOpening) {
   const bounds = placeWindow(msg.anchor, msg.screen, WINDOW_SIZES[settings.windowSize] || WINDOW_SIZES.medium);
 
   const job = { prompt, target, autoSend: settings.autoSend, createdAt: Date.now() };
+
+  if (msg.openIn === 'pip' && sender.tab) {
+    const tabId = await openMirrorTab(sender.tab, site.url);
+    await setPending(tabId, { ...job, autoSend: true, mirror: true });
+    return { ok: true, target, where: 'pip' };
+  }
 
   if (panelOpening) {
     if (await panelOpening) {
