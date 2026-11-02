@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AskHere</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <div class="bar">
+      <span class="spark" aria-hidden="true">✦</span>
+      <span class="name">AskHere</span>
+      <span class="ai" id="ai"></span>
+      <span class="grow"></span>
+      <button id="full" type="button" title="Open this chat in a normal tab">⤢</button>
+      <button id="close" type="button" title="Close">✕</button>
+    </div>
+    <div id="empty" class="empty">
+      <p><b>✦ AskHere</b></p>
+      <p>Select text on the page and click <b>Ask AI</b>. The answer shows up here.</p>
+    </div>
+    <iframe id="frame" title="AI chat" allow="clipboard-read; clipboard-write" hidden></iframe>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

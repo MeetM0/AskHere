@@ -1,7 +1,8 @@
-// Runs on claude.ai and chatgpt.com. If AskHere opened this tab with a
-// question, type it into the chat box and press send, exactly like the user
-// would. If anything goes wrong, the question is put on the clipboard so the
-// user can paste it.
+// Runs on claude.ai and chatgpt.com, both in AskHere's small window and inside
+// AskHere's side panel (used when Chrome is fullscreen on a Mac). If AskHere
+// opened this page with a question, type it into the chat box and press send,
+// exactly like the user would. If anything goes wrong, the question is put on
+// the clipboard so the user can paste it.
 //
 // The selectors below are the fragile part: if Claude or ChatGPT change their
 // page, update them here.
@@ -48,7 +49,7 @@
   // Hides the site's sidebar and top bar (the window is narrow, so both sites
   // already use their mobile layout), renames the window "AskHere", and adds a
   // small AskHere bar with: open in a normal tab, full view toggle, close.
-  function compactMode() {
+  function compactMode({ branded = true } = {}) {
     const AI_NAME = site === 'claude' ? 'Claude' : 'ChatGPT';
     const TITLE = `AskHere · ${AI_NAME}`;
     const root = document.documentElement;
@@ -68,6 +69,12 @@
       }
     `);
     document.adoptedStyleSheets = [...document.adoptedStyleSheets, pageSheet];
+    const root0 = document.documentElement;
+    if (!branded) {
+      // Side panel: AskHere's own header is around this frame already.
+      root0.classList.add('askhere-compact');
+      return { setEnabled: (on) => root0.classList.toggle('askhere-compact', on) };
+    }
 
     // The bar lives in a shadow root so the site's CSS can't restyle it.
     const host = document.createElement('askhere-bar');
@@ -166,26 +173,58 @@
     return { setEnabled };
   }
 
-  // Only act in windows AskHere opened. Normal claude.ai / chatgpt.com tabs
-  // are left completely alone.
-  let info;
-  try {
-    info = await chrome.runtime.sendMessage({ type: 'askhere:window-info' });
-  } catch {
-    return;
-  }
-  if (!info?.isAskWindow) return;
-  const compact = info.compact ? compactMode() : null;
-
-  // The page can finish loading before AskHere has recorded the question for
-  // this tab, so ask a few times.
+  // Only act where AskHere opened the page. Normal claude.ai / chatgpt.com
+  // tabs are left completely alone.
+  const EXT_ORIGIN = `chrome-extension://${chrome.runtime.id}`;
+  const inFrame = window.top !== window;
+  let compact = null;
   let job = null;
-  for (let i = 0; i < 6 && !job; i++) {
-    if (i) await sleep(400);
+  let frameGiveUp = null;
+
+  if (inFrame) {
+    // Inside AskHere's side panel: the panel page is our parent. Anything else
+    // embedding claude.ai is ignored.
+    if (location.ancestorOrigins?.[0] !== EXT_ORIGIN) return;
+    const settings = await chrome.storage.local.get({ compactWindow: true }).catch(() => ({ compactWindow: true }));
+    if (settings.compactWindow) compact = compactMode({ branded: false });
+    job = await new Promise((resolve) => {
+      const onMsg = (e) => {
+        if (e.origin !== EXT_ORIGIN || e.data?.askhere !== 'job') return;
+        removeEventListener('message', onMsg);
+        resolve(e.data.job || null);
+      };
+      addEventListener('message', onMsg);
+      parent.postMessage({ askhere: 'ready' }, EXT_ORIGIN);
+      setTimeout(() => resolve(null), 5000);
+    });
+    frameGiveUp = () => parent.postMessage({ askhere: 'need-login', job }, EXT_ORIGIN);
+    // Let the panel know the chat's address, for its "open in a tab" button.
+    let lastUrl = '';
+    setInterval(() => {
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        parent.postMessage({ askhere: 'url', url: lastUrl }, EXT_ORIGIN);
+      }
+    }, 1000);
+  } else {
+    let info;
     try {
-      job = await chrome.runtime.sendMessage({ type: 'askhere:take-pending' });
+      info = await chrome.runtime.sendMessage({ type: 'askhere:window-info' });
     } catch {
       return;
+    }
+    if (!info?.isAskWindow) return;
+    compact = info.compact ? compactMode() : null;
+
+    // The page can finish loading before AskHere has recorded the question for
+    // this tab, so ask a few times.
+    for (let i = 0; i < 6 && !job; i++) {
+      if (i) await sleep(400);
+      try {
+        job = await chrome.runtime.sendMessage({ type: 'askhere:take-pending' });
+      } catch {
+        return;
+      }
     }
   }
   if (!job?.prompt) return;
@@ -266,7 +305,8 @@
   async function giveUp(message) {
     compact?.setEnabled(false);
     // Keep the question so it is sent automatically after the user logs in.
-    chrome.runtime.sendMessage({ type: 'askhere:put-pending', job }).catch(() => {});
+    if (frameGiveUp) frameGiveUp();
+    else chrome.runtime.sendMessage({ type: 'askhere:put-pending', job }).catch(() => {});
     try {
       await navigator.clipboard.writeText(job.prompt);
       toast(`${message} Your question is also copied, so you can paste it.`);

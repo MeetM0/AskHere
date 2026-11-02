@@ -18,7 +18,7 @@
   const BOX_WIDTH = 360;
 
   // ---------- settings ----------
-  let prefs = { triggerMode: 'button', disabledSites: '', target: 'auto', defaultAI: 'claude' };
+  let prefs = { triggerMode: 'button', disabledSites: '', target: 'auto', defaultAI: 'claude', openIn: 'auto' };
   try {
     chrome.storage.local.get(prefs).then((s) => (prefs = s));
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -175,6 +175,8 @@
     const left = clamp(r.right - w / 2, 6, innerWidth - w - 6);
     let top = r.bottom + 8;
     if (top + 34 > innerHeight) top = r.top - 40;
+    // Selection ends off screen (e.g. Ctrl+A on a long page): keep the button reachable.
+    top = clamp(top, 6, innerHeight - 40);
     trigger.style.transform = `translate(${left}px, ${top}px)`;
   }
 
@@ -290,7 +292,9 @@
     const w = box.el.offsetWidth || BOX_WIDTH;
     const hgt = box.el.offsetHeight || 160;
     if (!box.placement) box.placement = innerHeight - r.bottom >= hgt + 16 || innerHeight - r.bottom >= r.top ? 'below' : 'above';
-    const top = box.placement === 'below' ? r.bottom + 10 : r.top - hgt - 10;
+    let top = box.placement === 'below' ? r.bottom + 10 : r.top - hgt - 10;
+    // Never let the box leave the screen (huge selections, text scrolled away).
+    top = clamp(top, 8, Math.max(8, innerHeight - hgt - 8));
     const left = clamp(r.left, 8, Math.max(8, innerWidth - w - 8));
     box.el.style.transform = `translate(${Math.round(left)}px, ${Math.round(top)}px)`;
   }
@@ -304,8 +308,11 @@
     const toolbar = Math.max(0, window.outerHeight - window.innerHeight);
     const sx = window.screenX;
     const sy = window.screenY + toolbar;
+    const mode = globalThis.AskHereMode;
+    const openIn = mode ? mode.chooseOpenIn(prefs.openIn, mode.detectEnv(window)) : 'window';
     const message = {
       type: 'askhere:ask',
+      openIn,
       selection: cap.text,
       question,
       target: ai,

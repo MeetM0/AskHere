@@ -31,6 +31,7 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 - **No API key.** It just opens the normal site with your login: Free, Pro, Plus, Team, whatever you have.
 - **Small, clean window** (380 × 520 by default) placed **below, above or beside the text**, whichever fits on screen.
 - **Compact look:** the site's sidebar and top bar are hidden, and the window is titled and iconed as AskHere. A small ✦ AskHere bar in the corner lets you open the chat in a normal tab (⤢), show the full page (☰), or close the window (✕).
+- **Stays in fullscreen on a Mac:** uses Chrome's side panel there, so you never get thrown out to the desktop.
 - **One reusable window** by default, so you don't end up with a pile of windows.
 - Keyboard shortcut **Alt+Shift+A** and **right-click → Ask AI**.
 - Optional text added to every question (for example "Answer briefly." or "Answer in Hindi.").
@@ -50,6 +51,11 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 5. Make sure you're logged in at [claude.ai](https://claude.ai) and/or [chatgpt.com](https://chatgpt.com).
 6. Highlight something and click **✦ Ask AI**.
 
+## Permissions
+
+- **Read and change data on claude.ai and chatgpt.com:** to type your question into the chat box, and to let those sites appear inside AskHere's side panel. That's only for side-panel frames; your normal tabs are untouched.
+- **Side panel**, **storage**, **context menu**. AskHere can't read your other tabs or your history.
+
 ## Privacy
 
 - AskHere has **no servers and no analytics**. It doesn't call any AI API.
@@ -61,6 +67,9 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 - Auto-send works by finding the chat box on claude.ai / chatgpt.com. If those sites change their page, auto-send can break. When that happens, your question is copied so you can paste it, and the fix is usually a one-line selector update in [`extension/inject.js`](extension/inject.js). Issues and PRs are welcome.
 - If you're not logged in, AskHere shows the full page so you can log in inside the window. Your question is then sent automatically, as long as you log in within 10 minutes.
 - Chrome always shows a thin title bar with the address on popup windows. Extensions can't remove it.
+- **Fullscreen on a Mac:** macOS gives a fullscreen app its own Space, and a separate window would pull you out to the desktop. So when Chrome is fullscreen on a Mac, AskHere opens your Claude or ChatGPT in **Chrome's side panel** instead, inside the same fullscreen window. On Windows and Linux, and on a Mac when not fullscreen, you get the small window. Change this under "Open in" in settings.
+- Fullscreen or maximized Chrome on Windows: the AI window still opens small and normal, never fullscreen.
+- Text selected inside embedded frames (some editors and PDF viewers) isn't supported yet.
 - Browsers don't let extensions keep a window "always on top". If you click back on the page, the AI window may go behind it. Click **Ask AI** again, or use the shortcut, to bring it back next to your text.
 
 ## Settings
@@ -69,6 +78,7 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 | --- | --- | --- |
 | Which AI | Automatic | Matches the site you're on, otherwise your default |
 | Default AI | Claude | or ChatGPT |
+| Open in | Automatic | Small window, or the side panel when Chrome is fullscreen on a Mac |
 | Window size | Small (380 × 520) | Small / Medium (440 × 620) / Large (560 × 760) |
 | Compact look | On | Hides the site's sidebar and top bar |
 | Reuse one window | On | Moves the window to each new question |
@@ -82,8 +92,8 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 No build step. The `extension/` folder is the extension.
 
 ```bash
-npm test            # unit tests: window placement, prompt, AI choice
-npm run test:e2e    # loads the extension in Chromium and runs the full flow against a fake claude.ai page
+npm test            # 35 unit tests: placement, fullscreen/maximized handling, Mac side-panel choice, prompt, AI choice
+npm run test:e2e    # 40 real-browser scenarios against fake claude.ai / chatgpt.com pages
 npm run zip         # packages extension/ into askhere.zip for the Chrome Web Store
 ```
 

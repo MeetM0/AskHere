@@ -16,7 +16,10 @@ Thanks for helping! AskHere is plain JavaScript with **no build step**, so getti
 | `extension/panel.css` | Styles for that UI (inside a shadow root so sites can't break them) |
 | `extension/background.js` | Service worker: opens or moves the Claude/ChatGPT popup window next to the text and remembers the question for it |
 | `extension/inject.js` | Runs on claude.ai / chatgpt.com: types the question into the chat box and presses send |
+| `extension/sidepanel.*` | Side panel used in Mac fullscreen: shows claude.ai / chatgpt.com in a frame and hands the question to it |
+| `extension/lib/mode.js` | Decides small window vs side panel (Mac + fullscreen → side panel) |
 | `extension/lib/placement.js` | Works out where on screen the window goes |
+| `extension/lib/windows.js` | Opens/reuses the window and keeps it small and normal (also when Chrome is fullscreen or maximized) |
 | `extension/lib/prompt.js` | Builds the message that gets sent |
 | `extension/options.*` | Settings page |
 
@@ -26,7 +29,8 @@ Thanks for helping! AskHere is plain JavaScript with **no build step**, so getti
 
 ```bash
 npm test            # unit tests (Node 20+)
-npm run test:e2e    # loads the real extension in Chromium against a fake claude.ai page (needs Playwright)
+npm run test:e2e    # real-browser scenarios against fake claude.ai / chatgpt.com pages (needs Playwright)
+npm run test:e2e -- chatgpt   # only scenarios whose name contains "chatgpt"
 ```
 
 ## Guidelines

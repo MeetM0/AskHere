@@ -7,9 +7,47 @@
 import { getSettings, resolveTarget, AI_SITES, WINDOW_SIZES } from './lib/settings.js';
 import { buildPrompt } from './lib/prompt.js';
 import { placeWindow } from './lib/placement.js';
+import { openAIWindow, isAskTab, markAskTab, openFull } from './lib/windows.js';
 
 const MENU_ID = 'askhere-ask';
 const PENDING_TTL_MS = 10 * 60 * 1000;
+
+// Claude/ChatGPT refuse to be shown inside other pages. Allow it only for
+// frames in AskHere's side panel: side-panel requests have no tab (tabId -1),
+// so normal browsing is unaffected. Session rules are cleared when Chrome
+// restarts, so this runs every time the service worker starts.
+const FRAME_RULE_ID = 1;
+async function allowSidePanelFrames() {
+  try {
+    await chrome.declarativeNetRequest.updateSessionRules({
+      removeRuleIds: [FRAME_RULE_ID],
+      addRules: [
+        {
+          id: FRAME_RULE_ID,
+          priority: 1,
+          action: {
+            type: 'modifyHeaders',
+            responseHeaders: [
+              { header: 'x-frame-options', operation: 'remove' },
+              { header: 'content-security-policy', operation: 'remove' },
+            ],
+          },
+          condition: {
+            requestDomains: ['claude.ai', 'chatgpt.com', 'chat.openai.com'],
+            resourceTypes: ['sub_frame'],
+            tabIds: [chrome.tabs.TAB_ID_NONE],
+          },
+        },
+      ],
+    });
+  } catch (err) {
+    console.warn('AskHere: could not set side panel frame rule', err);
+  }
+}
+allowSidePanelFrames();
+
+// The toolbar icon opens settings, not the side panel.
+chrome.sidePanel?.setPanelBehavior?.({ openPanelOnActionClick: false }).catch(() => {});
 
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.contextMenus.create({ id: MENU_ID, title: 'Ask AI about "%s"', contexts: ['selection'] });
@@ -36,7 +74,21 @@ function sendToTab(tabId, message) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === 'askhere:ask') {
-    ask(msg, sender).then(sendResponse, (err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    // sidePanel.open() only works while the click that asked is still "fresh",
+    // so it must be called right now, before any await.
+    let panelOpening = null;
+    if (msg.openIn === 'sidepanel' && sender.tab?.windowId != null && chrome.sidePanel?.open) {
+      panelOpening = chrome.sidePanel.open({ windowId: sender.tab.windowId }).then(
+        () => true,
+        (err) => {
+          console.warn('AskHere: side panel did not open, using a tab instead.', err);
+          return false;
+        }
+      );
+    }
+    ask(msg, sender, panelOpening).then(sendResponse, (err) =>
+      sendResponse({ ok: false, error: String(err?.message || err) })
+    );
     return true; // async response
   }
   if (msg?.type === 'askhere:take-pending') {
@@ -52,7 +104,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg?.type === 'askhere:close-window' && sender.tab) {
-    isAskTab(sender.tab.id).then((yes) => yes && chrome.windows.remove(sender.tab.windowId));
+    closeAskTab(sender.tab);
   }
   if (msg?.type === 'askhere:open-full' && sender.tab) {
     openFull(sender.tab, msg.url);
@@ -62,24 +114,33 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 });
 
+// The AskHere bar's ✕: close the small window, or just the tab if AskHere
+// opened a tab inside your normal (e.g. fullscreen) window.
+async function closeAskTab(tab) {
+  if (!(await isAskTab(tab.id))) return;
+  const win = await chrome.windows.get(tab.windowId, { populate: true }).catch(() => null);
+  if (win?.type === 'popup') await chrome.windows.remove(win.id);
+  else await chrome.tabs.remove(tab.id);
+}
+
 async function windowInfo(tabId) {
   if (!(await isAskTab(tabId))) return { isAskWindow: false };
   const settings = await getSettings();
   return { isAskWindow: true, compact: settings.compactWindow };
 }
 
-// Move the side chat into a normal browser tab (full claude.ai / chatgpt.com).
-async function openFull(tab, url) {
-  if (!(await isAskTab(tab.id))) return;
-  const [normal] = await chrome.windows.getAll({ windowTypes: ['normal'] });
-  await chrome.tabs.create({ url: url || tab.url, windowId: normal?.id, active: true });
-  if (normal) await chrome.windows.update(normal.id, { focused: true });
-  await chrome.windows.remove(tab.windowId);
-}
-
 // ---------- asking ----------
 
-async function ask(msg, sender) {
+// Questions are handled one at a time, so two quick clicks can't open two
+// windows or mix up which question goes where.
+let queue = Promise.resolve();
+function ask(msg, sender, panelOpening) {
+  const run = queue.then(() => askNow(msg, sender, panelOpening));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function askNow(msg, sender, panelOpening) {
   const settings = await getSettings();
   const target = msg.target || resolveTarget(settings, msg.hostname);
   const site = AI_SITES[target] || AI_SITES.claude;
@@ -87,68 +148,27 @@ async function ask(msg, sender) {
   const bounds = placeWindow(msg.anchor, msg.screen, WINDOW_SIZES[settings.windowSize] || WINDOW_SIZES.medium);
 
   const job = { prompt, target, autoSend: settings.autoSend, createdAt: Date.now() };
-  const tabId = await openAIWindow(site.url, bounds, settings.reuseWindow);
-  await setPending(tabId, job);
+
+  if (panelOpening) {
+    if (await panelOpening) {
+      await chrome.storage.session.set({ sidepanelJob: job });
+      return { ok: true, target, where: 'sidepanel' };
+    }
+    // Side panel unavailable: open a tab right next to this one, in the same
+    // (fullscreen) window, so you stay where you are.
+    const tab = await chrome.tabs.create({
+      url: site.url,
+      windowId: sender.tab.windowId,
+      index: sender.tab.index + 1,
+      openerTabId: sender.tab.id,
+      active: true,
+    });
+    await markAskTab(tab.id);
+    await setPending(tab.id, job);
+    return { ok: true, target, where: 'tab' };
+  }
+  await openAIWindow(site.url, bounds, settings.reuseWindow, { onTab: (tabId) => setPending(tabId, job) });
   return { ok: true, target };
-}
-
-// Chrome rejects bounds it thinks are off-screen (odd multi-monitor setups,
-// zoomed pages). Fall back to just the size, then to Chrome's defaults.
-async function withBounds(fn, bounds) {
-  const attempts = [bounds, { width: bounds.width, height: bounds.height }, {}];
-  let lastErr;
-  for (const b of attempts) {
-    try {
-      return await fn(b);
-    } catch (err) {
-      lastErr = err;
-      if (!/bounds/i.test(String(err?.message))) throw err;
-    }
-  }
-  throw lastErr;
-}
-
-async function openAIWindow(url, bounds, reuse) {
-  if (reuse) {
-    const existing = await getReusableWindow();
-    if (existing) {
-      await chrome.windows.update(existing.windowId, { state: 'normal' });
-      await withBounds((b) => chrome.windows.update(existing.windowId, { ...b, focused: true }), bounds);
-      await chrome.tabs.update(existing.tabId, { url, active: true });
-      await markAskTab(existing.tabId);
-      return existing.tabId;
-    }
-  }
-  const win = await withBounds((b) => chrome.windows.create({ url, type: 'popup', focused: true, ...b }), bounds);
-  const tabId = win.tabs[0].id;
-  await markAskTab(tabId);
-  if (reuse) await chrome.storage.session.set({ askWindow: { windowId: win.id, tabId } });
-  return tabId;
-}
-
-// Tabs AskHere opened get the compact, AskHere-branded look (see inject.js).
-async function markAskTab(tabId) {
-  await chrome.storage.session.set({ [`askTab:${tabId}`]: true });
-}
-
-async function isAskTab(tabId) {
-  if (tabId == null) return false;
-  const key = `askTab:${tabId}`;
-  const { [key]: yes } = await chrome.storage.session.get(key);
-  return !!yes;
-}
-
-async function getReusableWindow() {
-  const { askWindow } = await chrome.storage.session.get('askWindow');
-  if (!askWindow) return null;
-  try {
-    const tab = await chrome.tabs.get(askWindow.tabId);
-    if (tab.windowId === askWindow.windowId) return askWindow;
-  } catch {
-    /* closed */
-  }
-  await chrome.storage.session.remove('askWindow');
-  return null;
 }
 
 chrome.windows.onRemoved.addListener(async (windowId) => {

@@ -1,7 +1,7 @@
 import { getSettings } from './lib/settings.js';
 
 const $ = (id) => document.getElementById(id);
-const valueFields = ['target', 'defaultAI', 'windowSize', 'prefix', 'triggerMode', 'disabledSites'];
+const valueFields = ['target', 'defaultAI', 'openIn', 'windowSize', 'prefix', 'triggerMode', 'disabledSites'];
 const checkFields = ['compactWindow', 'reuseWindow', 'autoSend'];
 
 async function load() {

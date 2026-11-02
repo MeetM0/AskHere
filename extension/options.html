@@ -44,6 +44,15 @@
       <section>
         <h2>The AI window</h2>
         <label class="field">
+          <span>Open in</span>
+          <select id="openIn">
+            <option value="auto">Automatic: small window, or the side panel when Chrome is fullscreen on a Mac</option>
+            <option value="window">Always a small window</option>
+            <option value="sidepanel">Always Chrome's side panel</option>
+          </select>
+          <small>On a Mac, a fullscreen app has its own desktop Space, so a separate window would take you out of fullscreen. The side panel stays inside it.</small>
+        </label>
+        <label class="field">
           <span>Size</span>
           <select id="windowSize">
             <option value="small">Small (380 × 520)</option>
