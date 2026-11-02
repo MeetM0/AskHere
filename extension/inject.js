@@ -42,11 +42,143 @@
 
   const site = /(^|\.)claude\.ai$/.test(location.hostname) ? 'claude' : 'chatgpt';
   const S = SITES[site];
-
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  // ---------- compact, AskHere-branded window ----------
+  // Hides the site's sidebar and top bar (the window is narrow, so both sites
+  // already use their mobile layout), renames the window "AskHere", and adds a
+  // small AskHere bar with: open in a normal tab, full view toggle, close.
+  function compactMode() {
+    const AI_NAME = site === 'claude' ? 'Claude' : 'ChatGPT';
+    const TITLE = `AskHere · ${AI_NAME}`;
+    const root = document.documentElement;
+
+    const pageSheet = new CSSStyleSheet();
+    pageSheet.replaceSync(`
+      html.askhere-compact nav,
+      html.askhere-compact header,
+      html.askhere-compact [data-testid="menu-sidebar"],
+      html.askhere-compact [data-testid="pin-sidebar-toggle"],
+      html.askhere-compact button[aria-label="Open sidebar"],
+      html.askhere-compact #stage-slideover-sidebar,
+      html.askhere-compact #page-header,
+      html.askhere-compact [data-testid="open-sidebar-button"],
+      html.askhere-compact [data-testid="close-sidebar-button"] {
+        display: none !important;
+      }
+    `);
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, pageSheet];
+
+    // The bar lives in a shadow root so the site's CSS can't restyle it.
+    const host = document.createElement('askhere-bar');
+    host.setAttribute('style', 'all: initial; position: fixed; top: 6px; right: 6px; z-index: 2147483647;');
+    const shadow = host.attachShadow({ mode: 'closed' });
+    const barSheet = new CSSStyleSheet();
+    barSheet.replaceSync(`
+      .bar { display: flex; align-items: center; gap: 2px; padding: 3px 4px 3px 9px; border-radius: 999px;
+        background: rgba(255,255,255,.92); border: 1px solid rgba(20,16,30,.12);
+        box-shadow: 0 4px 14px rgba(20,16,30,.14); backdrop-filter: blur(6px);
+        font: 600 12px/1 ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; color: #1c1b1f; }
+      .spark { color: #c2612c; margin-right: 3px; }
+      .name { margin-right: 4px; }
+      button { all: unset; cursor: pointer; width: 22px; height: 22px; border-radius: 50%;
+        display: grid; place-items: center; color: #6b6870; font-size: 13px; }
+      button:hover { background: rgba(20,16,30,.08); color: #1c1b1f; }
+      button:focus-visible { outline: 2px solid #c2612c; }
+      @media (prefers-color-scheme: dark) {
+        .bar { background: rgba(34,32,38,.92); border-color: rgba(255,255,255,.12); color: #eceaf0; }
+        .spark { color: #e07a43; }
+        button { color: #a29fa8; }
+        button:hover { background: rgba(255,255,255,.1); color: #eceaf0; }
+      }
+    `);
+    shadow.adoptedStyleSheets = [barSheet];
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.innerHTML =
+      '<span class="spark">✦</span><span class="name">AskHere</span>' +
+      '<button data-act="full" title="Open this chat in a normal tab">⤢</button>' +
+      '<button data-act="toggle" title="Show the full page">☰</button>' +
+      '<button data-act="close" title="Close">✕</button>';
+    shadow.append(bar);
+    bar.addEventListener('click', (e) => {
+      const act = e.target.closest('button')?.dataset.act;
+      if (act === 'full') chrome.runtime.sendMessage({ type: 'askhere:open-full', url: location.href }).catch(() => {});
+      if (act === 'close') chrome.runtime.sendMessage({ type: 'askhere:close-window' }).catch(() => {});
+      if (act === 'toggle') setEnabled(!root.classList.contains('askhere-compact'));
+    });
+
+    function setEnabled(on) {
+      root.classList.toggle('askhere-compact', on);
+      const t = shadow.querySelector('[data-act="toggle"]');
+      t.title = on ? 'Show the full page' : 'Back to compact view';
+    }
+
+    // Window title + icon say "AskHere"; the site keeps resetting them, so re-apply.
+    let iconUrl = chrome.runtime.getURL('icons/icon32.png');
+    fetch(iconUrl)
+      .then((r) => r.blob())
+      .then(
+        (b) =>
+          new Promise((res) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.readAsDataURL(b);
+          })
+      )
+      .then((dataUrl) => {
+        iconUrl = dataUrl;
+        brand();
+      })
+      .catch(() => {});
+
+    function brand() {
+      if (!document.head) return;
+      if (document.title !== TITLE) document.title = TITLE;
+      const icons = document.head.querySelectorAll('link[rel~="icon"]');
+      const ours = [...icons].find((l) => l.dataset.askhere);
+      for (const l of icons) if (l !== ours) l.remove();
+      if (!ours) {
+        const link = document.createElement('link');
+        link.rel = 'icon';
+        link.dataset.askhere = '1';
+        link.href = iconUrl;
+        document.head.append(link);
+      } else if (ours.href !== iconUrl) {
+        ours.href = iconUrl;
+      }
+    }
+
+    let scheduled = false;
+    new MutationObserver(() => {
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(() => {
+        scheduled = false;
+        brand();
+        if (!host.isConnected) root.append(host);
+      });
+    }).observe(root, { childList: true, subtree: true, characterData: true });
+
+    root.append(host);
+    setEnabled(true);
+    brand();
+    return { setEnabled };
+  }
+
+  // Only act in windows AskHere opened. Normal claude.ai / chatgpt.com tabs
+  // are left completely alone.
+  let info;
+  try {
+    info = await chrome.runtime.sendMessage({ type: 'askhere:window-info' });
+  } catch {
+    return;
+  }
+  if (!info?.isAskWindow) return;
+  const compact = info.compact ? compactMode() : null;
+
   // The page can finish loading before AskHere has recorded the question for
-  // this tab, so ask a few times. Pages AskHere didn't open just get nothing.
+  // this tab, so ask a few times.
   let job = null;
   for (let i = 0; i < 6 && !job; i++) {
     if (i) await sleep(400);
@@ -132,6 +264,7 @@
   }
 
   async function giveUp(message) {
+    compact?.setEnabled(false);
     // Keep the question so it is sent automatically after the user logs in.
     chrome.runtime.sendMessage({ type: 'askhere:put-pending', job }).catch(() => {});
     try {

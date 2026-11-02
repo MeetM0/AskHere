@@ -21,7 +21,7 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 
 1. Select text on any website. A **✦ Ask AI** button appears.
 2. Click it. A small box opens next to the text. Pick **Explain / Simplify / Example / Summarize / Why?** or type your own question.
-3. A small **claude.ai** (or **chatgpt.com**) window opens right next to the text. AskHere types your question, including the quoted text, and presses send.
+3. A small AskHere window opens right next to the text with **your Claude** (or ChatGPT) inside. The site's sidebar and top bar are hidden so it's just the chat. AskHere types your question, including the quoted text, and presses send.
 4. Ask follow-ups right there in that window. The next time you ask about something, the same window moves next to the new text.
 
 ## Features
@@ -29,7 +29,8 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 - Works on **any website**, including inside Claude and ChatGPT themselves.
 - **Automatic AI choice:** reading on chatgpt.com opens ChatGPT, reading on claude.ai opens Claude, and everywhere else uses your default. You can switch per question.
 - **No API key.** It just opens the normal site with your login: Free, Pro, Plus, Team, whatever you have.
-- The window is placed **below, above or beside the text**, whichever fits on screen, and kept on screen.
+- **Small, clean window** (380 × 520 by default) placed **below, above or beside the text**, whichever fits on screen.
+- **Compact look:** the site's sidebar and top bar are hidden, and the window is titled and iconed as AskHere. A small ✦ AskHere bar in the corner lets you open the chat in a normal tab (⤢), show the full page (☰), or close the window (✕).
 - **One reusable window** by default, so you don't end up with a pile of windows.
 - Keyboard shortcut **Alt+Shift+A** and **right-click → Ask AI**.
 - Optional text added to every question (for example "Answer briefly." or "Answer in Hindi.").
@@ -58,7 +59,8 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 ## Good to know
 
 - Auto-send works by finding the chat box on claude.ai / chatgpt.com. If those sites change their page, auto-send can break. When that happens, your question is copied so you can paste it, and the fix is usually a one-line selector update in [`extension/inject.js`](extension/inject.js). Issues and PRs are welcome.
-- If you're not logged in, log in inside the window and your question is sent automatically, as long as you do it within 10 minutes.
+- If you're not logged in, AskHere shows the full page so you can log in inside the window. Your question is then sent automatically, as long as you log in within 10 minutes.
+- Chrome always shows a thin title bar with the address on popup windows. Extensions can't remove it.
 - Browsers don't let extensions keep a window "always on top". If you click back on the page, the AI window may go behind it. Click **Ask AI** again, or use the shortcut, to bring it back next to your text.
 
 ## Settings
@@ -67,7 +69,8 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 | --- | --- | --- |
 | Which AI | Automatic | Matches the site you're on, otherwise your default |
 | Default AI | Claude | or ChatGPT |
-| Window size | Medium (520 × 720) | Small / Medium / Large |
+| Window size | Small (380 × 520) | Small / Medium (440 × 620) / Large (560 × 760) |
+| Compact look | On | Hides the site's sidebar and top bar |
 | Reuse one window | On | Moves the window to each new question |
 | Send automatically | On | Off = the question is typed in but not sent |
 | Add to every question | none | e.g. "Answer briefly." |

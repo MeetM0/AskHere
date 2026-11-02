@@ -47,10 +47,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     setPending(sender.tab.id, msg.job).then(() => sendResponse({ ok: true }));
     return true;
   }
+  if (msg?.type === 'askhere:window-info') {
+    windowInfo(sender.tab?.id).then(sendResponse);
+    return true;
+  }
+  if (msg?.type === 'askhere:close-window' && sender.tab) {
+    isAskTab(sender.tab.id).then((yes) => yes && chrome.windows.remove(sender.tab.windowId));
+  }
+  if (msg?.type === 'askhere:open-full' && sender.tab) {
+    openFull(sender.tab, msg.url);
+  }
   if (msg?.type === 'askhere:open-options') {
     chrome.runtime.openOptionsPage();
   }
 });
+
+async function windowInfo(tabId) {
+  if (!(await isAskTab(tabId))) return { isAskWindow: false };
+  const settings = await getSettings();
+  return { isAskWindow: true, compact: settings.compactWindow };
+}
+
+// Move the side chat into a normal browser tab (full claude.ai / chatgpt.com).
+async function openFull(tab, url) {
+  if (!(await isAskTab(tab.id))) return;
+  const [normal] = await chrome.windows.getAll({ windowTypes: ['normal'] });
+  await chrome.tabs.create({ url: url || tab.url, windowId: normal?.id, active: true });
+  if (normal) await chrome.windows.update(normal.id, { focused: true });
+  await chrome.windows.remove(tab.windowId);
+}
 
 // ---------- asking ----------
 
@@ -90,13 +115,27 @@ async function openAIWindow(url, bounds, reuse) {
       await chrome.windows.update(existing.windowId, { state: 'normal' });
       await withBounds((b) => chrome.windows.update(existing.windowId, { ...b, focused: true }), bounds);
       await chrome.tabs.update(existing.tabId, { url, active: true });
+      await markAskTab(existing.tabId);
       return existing.tabId;
     }
   }
   const win = await withBounds((b) => chrome.windows.create({ url, type: 'popup', focused: true, ...b }), bounds);
   const tabId = win.tabs[0].id;
-  await chrome.storage.session.set({ askWindow: { windowId: win.id, tabId } });
+  await markAskTab(tabId);
+  if (reuse) await chrome.storage.session.set({ askWindow: { windowId: win.id, tabId } });
   return tabId;
+}
+
+// Tabs AskHere opened get the compact, AskHere-branded look (see inject.js).
+async function markAskTab(tabId) {
+  await chrome.storage.session.set({ [`askTab:${tabId}`]: true });
+}
+
+async function isAskTab(tabId) {
+  if (tabId == null) return false;
+  const key = `askTab:${tabId}`;
+  const { [key]: yes } = await chrome.storage.session.get(key);
+  return !!yes;
 }
 
 async function getReusableWindow() {
@@ -135,4 +174,6 @@ async function takePending(tabId) {
   return job;
 }
 
-chrome.tabs.onRemoved.addListener((tabId) => chrome.storage.session.remove(`pending:${tabId}`));
+chrome.tabs.onRemoved.addListener((tabId) =>
+  chrome.storage.session.remove([`pending:${tabId}`, `askTab:${tabId}`])
+);

@@ -5,7 +5,8 @@ export const DEFAULTS = {
   // chatgpt.com -> ChatGPT, on claude.ai -> Claude), otherwise `defaultAI`.
   target: 'auto', // 'auto' | 'claude' | 'chatgpt'
   defaultAI: 'claude', // 'claude' | 'chatgpt'
-  windowSize: 'medium', // 'small' | 'medium' | 'large'
+  windowSize: 'small', // 'small' | 'medium' | 'large'
+  compactWindow: true, // hide the AI site's sidebar/header and brand the window as AskHere
   reuseWindow: true, // move & reuse one AskHere window instead of opening many
   autoSend: true, // press send for you
   prefix: '', // text added to every question, e.g. "Answer briefly."
@@ -19,9 +20,9 @@ export const AI_SITES = {
 };
 
 export const WINDOW_SIZES = {
-  small: { width: 420, height: 600 },
-  medium: { width: 520, height: 720 },
-  large: { width: 680, height: 860 },
+  small: { width: 380, height: 520 },
+  medium: { width: 440, height: 620 },
+  large: { width: 560, height: 760 },
 };
 
 export async function getSettings() {

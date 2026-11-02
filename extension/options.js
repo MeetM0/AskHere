@@ -2,7 +2,7 @@ import { getSettings } from './lib/settings.js';
 
 const $ = (id) => document.getElementById(id);
 const valueFields = ['target', 'defaultAI', 'windowSize', 'prefix', 'triggerMode', 'disabledSites'];
-const checkFields = ['reuseWindow', 'autoSend'];
+const checkFields = ['compactWindow', 'reuseWindow', 'autoSend'];
 
 async function load() {
   const s = await getSettings();

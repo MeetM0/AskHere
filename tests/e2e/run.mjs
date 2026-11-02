@@ -107,12 +107,21 @@ try {
   assert.match(sent, /Explain this\.$/);
   assert.equal(claudeLoads.at(-1), 'https://claude.ai/new');
 
+  // Compact, AskHere-branded window: site sidebar/header hidden, our bar shown.
+  assert.equal(await popup.locator('#side').isVisible(), false, 'sidebar should be hidden');
+  assert.equal(await popup.locator('#top').isVisible(), false, 'header should be hidden');
+  assert.equal(await popup.title(), 'AskHere · Claude');
+  assert.equal(await popup.locator('askhere-bar').count(), 1);
+  const icons = await popup.evaluate(() => [...document.querySelectorAll('link[rel~="icon"]')].map((l) => l.href.slice(0, 22)));
+  assert.deepEqual(icons, ['data:image/png;base64,']);
+
   // It's a small popup window, not a tab.
   const aiWin = await sw.evaluate(async () => {
     const { askWindow } = await chrome.storage.session.get('askWindow');
     return chrome.windows.get(askWindow.windowId);
   });
   assert.equal(aiWin.type, 'popup');
+  await popup.setViewportSize({ width: 380, height: 520 });
   await popup.screenshot({ path: path.join(shots, '3-claude-window.png') });
 
   // Asking again reuses the same window.
