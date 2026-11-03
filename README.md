@@ -43,7 +43,7 @@ AskHere turns that into one click. Your main conversation stays clean: each side
 
 1. Download this repo: **Code → Download ZIP**, then unzip it. Or run:
    ```bash
-   git clone https://github.com/MeetM0/askhere.git
+   git clone https://github.com/MeetM0/AIHelper.git
    ```
 2. Open `chrome://extensions` (also works in Edge, Brave, Arc and other Chromium browsers).
 3. Turn on **Developer mode** (top right).
